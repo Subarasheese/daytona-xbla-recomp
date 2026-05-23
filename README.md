@@ -4,7 +4,7 @@
 
 This project is a static recompilation of Daytona USA (Xbox 360 / XBLA, 2011) using Rexglue.
 
-No copyrighted game files are included. This tree intentionally excludes the
+No copyrighted game files are included. This tree excludes the
 extracted game directory, `default.xex`, `pe_image.bin`, media archives, audio,
 images, and build outputs.
 
