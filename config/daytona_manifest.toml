@@ -1,0 +1,20 @@
+[project]
+sdk_version = "0.8.0.0"
+name = "daytona"
+
+[entrypoint]
+file_path = "../assets/default.xex"
+out_directory_path = "../generated"
+includes = [
+  "daytona_rexglue.toml",
+]
+
+skip_lr = false
+skip_msr = false
+ctr_as_local = false
+xer_as_local = false
+cr_as_local = false
+reserved_as_local = false
+non_argument_as_local = false
+non_volatile_as_local = false
+generate_exception_handlers = false
