@@ -1,4 +1,4 @@
-# Daytona ReXGlue Recompilation
+# Daytona USA ReXGlue Recompilation
 
 ![Daytona Recompilation](daytonarecomp.png)
 
