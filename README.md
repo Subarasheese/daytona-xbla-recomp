@@ -142,7 +142,7 @@ reaches `Done`, then apply the working patch below.
 
 ## Apply Working Codegen Fixes
 
-The running `daytona_working` tree has manual fixes on top of regenerated
+The working daytona tree has manual fixes on top of regenerated
 codegen. Apply them with:
 
 ```sh
