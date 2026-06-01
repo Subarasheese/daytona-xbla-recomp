@@ -117,6 +117,12 @@ enum class HookId : size_t {
     kSceneRender,
     kScene3dRender,
 
+    // Render pipeline detail
+    kGpuDrawExecute,
+    kRenderPassBegin,
+    kRenderPassEnd,
+    kShaderBuildOrReuse,
+
     kCount,
 };
 

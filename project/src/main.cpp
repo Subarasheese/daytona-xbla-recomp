@@ -3,6 +3,9 @@
 
 #include "daytona_init.h"
 #include "daytona_debug.h"
+#include "daytona_inspector.h"
+#include "daytona_render.h"
+#include "daytona_renderer.h"
 #include "keyboard_driver.h"
 
 #include <rex/cvar.h>
@@ -18,6 +21,7 @@
 #include <algorithm>
 #include <charconv>
 #include <cctype>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -62,20 +66,6 @@ std::optional<int32_t> ParseInt(std::string_view value) {
     return out;
 }
 
-std::optional<double> ParseDouble(std::string_view value) {
-    try {
-        size_t parsed = 0;
-        const std::string text = Trim(value);
-        double out = std::stod(text, &parsed);
-        if (parsed != text.size()) {
-            return std::nullopt;
-        }
-        return out;
-    } catch (...) {
-        return std::nullopt;
-    }
-}
-
 std::optional<bool> ParseBool(std::string_view value) {
     const std::string lowered = Lower(Trim(value));
     if (lowered == "true" || lowered == "yes" || lowered == "on" || lowered == "1") {
@@ -87,22 +77,21 @@ std::optional<bool> ParseBool(std::string_view value) {
     return std::nullopt;
 }
 
-std::optional<std::pair<int32_t, int32_t>> ParseResolution(std::string_view value) {
-    std::string text = Lower(Trim(value));
-    std::replace(text.begin(), text.end(), 'X', 'x');
-    const size_t sep = text.find('x');
-    if (sep == std::string::npos) {
-        return std::nullopt;
-    }
-    auto width = ParseInt(text.substr(0, sep));
-    auto height = ParseInt(text.substr(sep + 1));
-    if (!width || !height || *width <= 0 || *height <= 0) {
-        return std::nullopt;
-    }
-    return std::pair<int32_t, int32_t>(*width, *height);
+int32_t ClampInt(int32_t value, int32_t min, int32_t max) {
+    return std::clamp(value, min, max);
 }
 
-int32_t ClampInt(int32_t value, int32_t min, int32_t max) {
+std::optional<double> ParseDouble(std::string_view value) {
+    const std::string text = Trim(value);
+    double out = 0.0;
+    auto [ptr, ec] = std::from_chars(text.data(), text.data() + text.size(), out);
+    if (ec != std::errc() || ptr != text.data() + text.size()) {
+        return std::nullopt;
+    }
+    return out;
+}
+
+double ClampDouble(double value, double min, double max) {
     return std::clamp(value, min, max);
 }
 
@@ -123,12 +112,12 @@ void SetCvarInt(std::string_view name, int32_t value) {
     SetCvar(name, std::to_string(value));
 }
 
-void SetCvarDouble(std::string_view name, double value) {
-    SetCvar(name, std::to_string(value));
-}
-
 void SetCvarBool(std::string_view name, bool value) {
     SetCvar(name, value ? "true" : "false");
+}
+
+void SetCvarDouble(std::string_view name, double value) {
+    SetCvar(name, std::to_string(value));
 }
 
 void WriteDefaultIni(const std::filesystem::path& path) {
@@ -146,25 +135,28 @@ void WriteDefaultIni(const std::filesystem::path& path) {
         << "# Edit this file, then restart the game.\n"
         << "\n"
         << "[Display]\n"
-        << "resolution = 1280x720\n"
-        << "game_resolution = 1280x720\n"
         << "fullscreen = true\n"
-        << "monitor = 0\n"
+        << "# Windowed mode size in pixels (0 = use a sensible default).\n"
+        << "# For ultrawide (21:9 or wider): set both values to your display resolution.\n"
+        << "# The 3D scene will automatically use a wider horizontal FOV (Hor+).\n"
+        << "# Example for 2560x1080: window_width = 2560, window_height = 1080\n"
+        << "# Example for 3440x1440: window_width = 3440, window_height = 1440\n"
+        << "window_width = 0\n"
+        << "window_height = 0\n"
+        << "# Vertical sync. Disable for uncapped frame rate.\n"
         << "vsync = true\n"
-        << "refresh_rate = 60\n"
-        << "letterbox = true\n"
-        << "safe_area_x = 100\n"
-        << "safe_area_y = 100\n"
         << "\n"
-        << "[Graphics]\n"
-        << "internal_resolution_scale = 1\n"
-        << "# off, app, 1, 2, 4, 8, 16\n"
-        << "anisotropic_filtering = app\n"
-        << "# bilinear is always available. CAS/FSR options depend on SDK build support.\n"
-        << "upscaler = bilinear\n"
-        << "cas_sharpness = 0.0\n"
-        << "fsr_quality = auto\n"
-        << "dither = false\n"
+        << "[Renderer]\n"
+        << "# Daytona is forced to native internal resolution for correctness.\n"
+        << "# Keep this at 1; higher values are ignored until the renderer is accurate.\n"
+        << "resolution_scale = 1\n"
+        << "# Final output effect: bilinear, cas, fsr\n"
+        << "#   bilinear - standard upscale to display resolution\n"
+        << "#   cas      - AMD Contrast Adaptive Sharpening\n"
+        << "#   fsr      - AMD FidelityFX Super Resolution 1.0 (sharpened upscale)\n"
+        << "present_effect = bilinear\n"
+        << "# CAS/FSR sharpness in [0.0, 1.0]. Only used when present_effect = cas or fsr.\n"
+        << "sharpness = 0.0\n"
         << "\n"
         << "[Storage]\n"
         << "cache_path = cache\n"
@@ -210,34 +202,6 @@ std::unordered_map<std::string, std::string> ReadIni(const std::filesystem::path
     return values;
 }
 
-int32_t ParseAnisotropic(std::string_view value) {
-    std::string text = Lower(Trim(value));
-    if (text == "app" || text == "auto" || text == "default") {
-        return -1;
-    }
-    if (text == "off" || text == "none" || text == "0") {
-        return 0;
-    }
-    if (!text.empty() && text.back() == 'x') {
-        text.pop_back();
-    }
-    auto parsed = ParseInt(text);
-    if (!parsed) {
-        return 3;
-    }
-    switch (ClampInt(*parsed, 1, 16)) {
-        case 1: return 1;
-        case 2: return 2;
-        case 3:
-        case 4: return 3;
-        case 5:
-        case 6:
-        case 7:
-        case 8: return 4;
-        default: return 5;
-    }
-}
-
 struct DaytonaIniSettings {
     bool debug_overlay = false;
 };
@@ -250,68 +214,63 @@ DaytonaIniSettings LoadDaytonaIni(const std::filesystem::path& exe_dir,
 
     DaytonaIniSettings settings;
 
-    auto set_resolution = [&](std::string_view key, std::string_view width_cvar,
-                              std::string_view height_cvar) {
-        if (auto it = values.find(std::string(key)); it != values.end()) {
-            if (auto resolution = ParseResolution(it->second)) {
-                SetCvarInt(width_cvar, ClampInt(resolution->first, 640, 8192));
-                SetCvarInt(height_cvar, ClampInt(resolution->second, 480, 8192));
-            }
-        }
-    };
-
-    set_resolution("display.resolution", "window_width", "window_height");
-    set_resolution("display.game_resolution", "video_mode_width", "video_mode_height");
-
     if (auto it = values.find("display.fullscreen"); it != values.end()) {
         if (auto value = ParseBool(it->second)) SetCvarBool("fullscreen", *value);
     }
-    if (auto it = values.find("display.monitor"); it != values.end()) {
-        if (auto value = ParseInt(it->second)) SetCvarInt("monitor", ClampInt(*value, 0, 16));
-    }
-    if (auto it = values.find("display.vsync"); it != values.end()) {
-        if (auto value = ParseBool(it->second)) SetCvarBool("vsync", *value);
-    }
-    if (auto it = values.find("display.refresh_rate"); it != values.end()) {
-        if (auto value = ParseDouble(it->second)) {
-            SetCvarDouble("video_mode_refresh_rate", std::clamp(*value, 24.0, 240.0));
+    int32_t win_w = 0;
+    int32_t win_h = 0;
+    if (auto it = values.find("display.window_width"); it != values.end()) {
+        if (auto value = ParseInt(it->second)) {
+            win_w = ClampInt(*value, 0, 8192);
+            SetCvarInt("window_width", win_w);
         }
     }
-    if (auto it = values.find("display.letterbox"); it != values.end()) {
-        if (auto value = ParseBool(it->second)) SetCvarBool("present_letterbox", *value);
-    }
-    if (auto it = values.find("display.safe_area_x"); it != values.end()) {
+    if (auto it = values.find("display.window_height"); it != values.end()) {
         if (auto value = ParseInt(it->second)) {
-            SetCvarInt("present_safe_area_x", ClampInt(*value, 0, 100));
-        }
-    }
-    if (auto it = values.find("display.safe_area_y"); it != values.end()) {
-        if (auto value = ParseInt(it->second)) {
-            SetCvarInt("present_safe_area_y", ClampInt(*value, 0, 100));
+            win_h = ClampInt(*value, 0, 8192);
+            SetCvarInt("window_height", win_h);
         }
     }
 
-    if (auto it = values.find("graphics.internal_resolution_scale"); it != values.end()) {
-        if (auto value = ParseInt(it->second)) {
-            SetCvarInt("resolution_scale", ClampInt(*value, 1, 8));
+    // Cap the GUEST video mode (= the resolution Daytona renders its 3D scene
+    // into) at 720 lines, independent of the on-screen window. Without this the
+    // SDK reports window_width/height (e.g. 3440x1440) as the video mode, so the
+    // game allocates its render targets at the full display size — 4x the fill
+    // rate of 720p, which tanks the in-race frame rate. The present still upscales
+    // this 720-line buffer to the full window. The video_mode_* cvars take
+    // precedence over window_* in GetConfiguredVideoMode{Width,Height}().
+    // Aspect correction (g_ar_scale = gameAR/windowAR) is independent of the
+    // internal resolution, so widescreen geometry stays correct.
+    if (win_w > 0 && win_h > 720) {
+        const int32_t internal_h = 720;
+        // Match the window's aspect ratio at 720 lines so the present upscales
+        // uniformly (e.g. 3440x1440 -> 1720x720; 1920x1080 -> 1280x720).
+        int32_t internal_w = static_cast<int32_t>(
+            std::lround(720.0 * static_cast<double>(win_w) / static_cast<double>(win_h)));
+        internal_w = ClampInt(internal_w & ~1, 640, 4095);  // even width, in range
+        SetCvarInt("video_mode_width", internal_w);
+        SetCvarInt("video_mode_height", internal_h);
+        REXLOG_ERROR("Daytona: capping internal video mode to {}x{} (window {}x{}) "
+                     "to keep in-race fill rate at 720p", internal_w, internal_h, win_w, win_h);
+    }
+
+    if (auto it = values.find("display.vsync"); it != values.end()) {
+        if (auto value = ParseBool(it->second)) SetCvarBool("vsync", *value);
+    }
+
+    // Do not apply renderer.resolution_scale from the INI yet. Daytona's
+    // texture/resolve path is sensitive to internal upscaling, so correctness
+    // takes priority until the native backend is validated end to end.
+    if (auto it = values.find("renderer.present_effect"); it != values.end()) {
+        const std::string effect = Lower(Trim(it->second));
+        if (effect == "bilinear" || effect == "cas" || effect == "fsr") {
+            SetCvar("present_effect", effect);
         }
     }
-    if (auto it = values.find("graphics.anisotropic_filtering"); it != values.end()) {
-        SetCvarInt("anisotropic_override", ParseAnisotropic(it->second));
-    }
-    if (auto it = values.find("graphics.upscaler"); it != values.end()) {
-        SetCvar("present_effect", Lower(Trim(it->second)));
-    }
-    if (auto it = values.find("graphics.cas_sharpness"); it != values.end()) {
+    if (auto it = values.find("renderer.sharpness"); it != values.end()) {
         if (auto value = ParseDouble(it->second)) {
-            SetCvarDouble("present_cas_additional_sharpness", std::clamp(*value, 0.0, 1.0));
+            SetCvarDouble("present_cas_additional_sharpness", ClampDouble(*value, 0.0, 1.0));
         }
-    }
-    if (auto it = values.find("graphics.fsr_quality"); it != values.end()) {
-        SetCvar("present_fsr_quality_mode", Lower(Trim(it->second)));
-    }
-    if (auto it = values.find("graphics.dither"); it != values.end()) {
-        if (auto value = ParseBool(it->second)) SetCvarBool("present_dither", *value);
     }
 
     if (auto it = values.find("storage.cache_path"); it != values.end()) {
@@ -343,6 +302,41 @@ DaytonaIniSettings LoadDaytonaIni(const std::filesystem::path& exe_dir,
     return settings;
 }
 
+void ApplyDaytonaBackendCorrectnessCvars() {
+    // Match emulator workarounds for Daytona: keep the guest-visible draw
+    // resolution native. ReXGlue's primitive processor cache is CPU-side
+    // index-conversion reuse, not the unsafe guest vertex cache seen in other
+    // emulators, so leave it enabled for performance.
+    SetCvarInt("resolution_scale", 1);
+    SetCvarInt("draw_resolution_scale_x", 1);
+    SetCvarInt("draw_resolution_scale_y", 1);
+    SetCvarInt("primitive_processor_cache_min_indices", 0);
+
+    // Daytona has shown visible texture instability when backend overrides move
+    // away from the guest's native assumptions. Keep the generic path close to
+    // defaults while native renderer work is still being validated.
+    SetCvarInt("anisotropic_override", -1);
+    SetCvarBool("async_shader_compilation", false);
+    SetCvarBool("vulkan_force_dxt45_rgba8_decode", false);
+    SetCvarBool("vulkan_readback_memexport", false);
+    SetCvarBool("vulkan_readback_resolve", false);
+    SetCvarBool("gpu_allow_invalid_fetch_constants", true);
+    SetCvar("readback_resolve", "none");
+
+    REXLOG_ERROR("Daytona backend correctness: native 1x draw resolution, "
+                 "primitive processor cache enabled, anisotropic override disabled, "
+                 "async shaders disabled, Vulkan DXT/readback overrides disabled, "
+                 "invalid fetch constants allowed");
+
+    // Confirm the guest video mode cap from LoadDaytonaIni took effect (that log
+    // line runs before the log file opens, so echo it here).
+    REXLOG_ERROR("Daytona guest video mode: {}x{} (window {}x{})",
+                 rex::cvar::GetFlagByName("video_mode_width"),
+                 rex::cvar::GetFlagByName("video_mode_height"),
+                 rex::cvar::GetFlagByName("window_width"),
+                 rex::cvar::GetFlagByName("window_height"));
+}
+
 class DaytonaDebugDialog : public rex::ui::ImGuiDialog {
 public:
     explicit DaytonaDebugDialog(rex::ui::ImGuiDrawer* drawer) : ImGuiDialog(drawer) {}
@@ -353,7 +347,7 @@ protected:
         UpdateVdSwapRate(snapshot, io.DeltaTime);
 
         ImGui::SetNextWindowPos(ImVec2(10.0f, 10.0f), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(260.0f, 80.0f), ImGuiCond_FirstUseEver);
+        ImGui::SetNextWindowSize(ImVec2(310.0f, 170.0f), ImGuiCond_FirstUseEver);
         ImGui::SetNextWindowBgAlpha(0.55f);
         if (!ImGui::Begin("Daytona##perf", nullptr, ImGuiWindowFlags_NoResize)) {
             ImGui::End();
@@ -366,6 +360,36 @@ protected:
         ImGui::Text("Swap  %.1f fps  stage: %s",
                     vd_swap_rate_,
                     daytona_debug::StageName(snapshot.stage));
+
+        ImGui::Separator();
+
+        const auto rs = daytona_render::GetLastFrameStats();
+        ImGui::Text("Frame %-6llu  Events %u",
+                    static_cast<unsigned long long>(rs.frame_index),
+                    rs.draw_execute_count + rs.render_pass_count +
+                        rs.texture_process_count + rs.shader_build_count);
+        ImGui::Text("Draw %-4u  Pass %-3u  Tex %-4u  Shdr %-3u",
+                    rs.draw_execute_count,
+                    rs.render_pass_count,
+                    rs.texture_process_count,
+                    rs.shader_build_count);
+        ImGui::Text("State %-4u  RT %-3u  Cmd %u",
+                    rs.state_change_count,
+                    rs.rt_bind_count,
+                    rs.command_submit_count);
+
+        ImGui::Separator();
+
+        if (ImGui::Button("Capture Frame")) {
+            daytona_render::RequestCapture();
+        }
+        const auto* cap = daytona_render::GetLastCapture();
+        if (cap) {
+            ImGui::SameLine();
+            ImGui::Text("%u evts%s",
+                        cap->event_count,
+                        cap->overflow_count ? " (overflow!)" : "");
+        }
 
         ImGui::End();
     }
@@ -407,16 +431,14 @@ protected:
     void OnPreSetup(rex::RuntimeConfig& config) override {
         (void)config;
         daytona_debug::SetStage(daytona_debug::AppStage::kPreSetup);
-        REXCVAR_SET(gpu_allow_invalid_fetch_constants, true);
-
-        REXCVAR_SET(vulkan_readback_memexport, true);
-        REXCVAR_SET(vulkan_readback_resolve, true);
-        REXCVAR_SET(vulkan_force_dxt45_rgba8_decode, true);
+        daytona::DaytonaRenderer::Install();
+        ApplyDaytonaBackendCorrectnessCvars();
     }
 
     void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
         if (ini_settings_.debug_overlay) {
             debug_dialog_ = std::make_unique<DaytonaDebugDialog>(drawer);
+            inspector_ = std::make_unique<DaytonaInspector>(drawer);
         }
     }
 
@@ -444,12 +466,15 @@ protected:
     }
 
     void OnShutdown() override {
+        daytona::DaytonaRenderer::Flush();
         debug_dialog_.reset();
+        inspector_.reset();
     }
 
 private:
     DaytonaIniSettings ini_settings_;
     std::unique_ptr<DaytonaDebugDialog> debug_dialog_;
+    std::unique_ptr<DaytonaInspector> inspector_;
 };
 
 REX_DEFINE_APP(daytona, DaytonaApp::Create)

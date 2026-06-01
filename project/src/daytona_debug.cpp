@@ -127,6 +127,11 @@ std::array<HookState, static_cast<size_t>(HookId::kCount)> g_hooks{{
     {"frame render sub_8212B828"},
     {"scene render sub_8212B3C8"},
     {"scene 3d render sub_8222CB88"},
+    // Render pipeline detail
+    {"draw execute sub_8225A0B0"},
+    {"render pass in sub_82239F30"},
+    {"render pass out sub_82239F30"},
+    {"shader build sub_823C4350"},
 }};
 
 uint64_t UptimeMicros() {

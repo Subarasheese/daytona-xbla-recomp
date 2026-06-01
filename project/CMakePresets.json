@@ -41,6 +41,24 @@
                 "lhs": "${hostSystemName}",
                 "rhs": "Windows"
             }
+        },
+        {
+            "name": "win-amd64-cross",
+            "displayName": "Windows AMD64 cross from Linux using Clang/MinGW",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/out/build/win-amd64-cross",
+            "toolchainFile": "${sourceDir}/cmake/clang-mingw-w64-x86_64.cmake",
+            "cacheVariables": {
+                "CMAKE_CONFIGURATION_TYPES": "Debug;Release;RelWithDebInfo",
+                "CMAKE_DEFAULT_BUILD_TYPE": "Release",
+                "REXGLUE_USE_D3D12": "OFF",
+                "REXGLUE_USE_VULKAN": "ON"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
         }
     ],
     "buildPresets": [
@@ -62,6 +80,11 @@
         {
             "name": "win-amd64-release",
             "configurePreset": "win-amd64",
+            "configuration": "Release"
+        },
+        {
+            "name": "win-amd64-cross-release",
+            "configurePreset": "win-amd64-cross",
             "configuration": "Release"
         }
     ]

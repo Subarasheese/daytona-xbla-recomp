@@ -28,6 +28,11 @@ add_executable(daytona
     src/stubs.cpp
     src/keyboard_driver.cpp
     src/daytona_debug.cpp
+    src/daytona_render.cpp
+    src/daytona_inspector.cpp
+    src/daytona_renderer.cpp
+    src/daytona_vulkan_renderer.cpp
+    src/daytona_import_wrapper_funcs.cpp
     ${GENERATED_SOURCES}
 )
 
@@ -59,11 +64,14 @@ target_compile_options(daytona PRIVATE
     $<$<CONFIG:RelWithDebInfo>:-O2 -g -DNDEBUG>
 )
 
-# Force all kernel symbols into the executable (needed for hook registration)
+# Force all kernel symbols into the executable (needed for hook registration).
+# On Windows the per-game __imp__ overrides in stubs.cpp are exported individually
+# via DAYTONA_EXPORT (__declspec(dllexport)) so the import resolver
+# (win_import_wrappers.cpp) can find them with GetProcAddress and prefer them over
+# the runtime DLL's defaults — the same precedence Linux gets from whole-archive +
+# dlsym(RTLD_DEFAULT). No blanket --export-all-symbols is needed (or wanted: it
+# would bloat the PE export table with every generated sub_ function).
 if(WIN32)
-    target_link_options(daytona PRIVATE
-        "LINKER:/WHOLEARCHIVE:$<TARGET_FILE:rex::kernel>"
-    )
 else()
     target_link_options(daytona PRIVATE
         -Wl,--whole-archive $<TARGET_FILE:rex::runtime> -Wl,--no-whole-archive
@@ -76,3 +84,30 @@ add_custom_target(daytona_codegen
     COMMENT "Regenerating Daytona codegen with vendored ReXGlue SDK"
     VERBATIM
 )
+
+if(WIN32 AND TARGET daytona)
+  set_target_properties(daytona PROPERTIES WIN32_EXECUTABLE OFF)
+endif()
+
+if(WIN32 AND TARGET daytona)
+  target_link_options(daytona PRIVATE "-mconsole" "-Wl,--subsystem,console")
+endif()
+
+if(WIN32 AND TARGET daytona)
+  target_sources(daytona PRIVATE src/winmain_shim.cpp)
+  # winmm provides timeBeginPeriod/timeEndPeriod used by the WinMain shim to pin
+  # the process timer resolution to 1ms (guest thread delays are built on
+  # ::Sleep(ms) and would otherwise quantize to the ~15.6ms default).
+  target_link_libraries(daytona PRIVATE winmm)
+endif()
+
+
+if(WIN32 AND TARGET daytona)
+  target_sources(daytona PRIVATE src/win_import_wrappers.cpp)
+endif()
+
+
+if(UNIX AND NOT WIN32 AND TARGET daytona)
+  target_sources(daytona PRIVATE src/linux_import_dispatch.cpp)
+  target_link_libraries(daytona PRIVATE ${CMAKE_DL_LIBS})
+endif()

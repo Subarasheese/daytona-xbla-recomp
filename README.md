@@ -14,6 +14,7 @@ images, and build outputs.
 config/                         ReXGlue manifest/config files
 patches/daytona_working_codegen.patch
 docs/CODEGEN_PATCHES.md         notes for the manual codegen patch
+docs/RENDERER_ROADMAP.md        notes for a future Daytona-native render bridge
 ppc/                            PPC metadata headers
 project/                        host project sources and CMake files
 scripts/extract_game.py         local STFS package extractor
