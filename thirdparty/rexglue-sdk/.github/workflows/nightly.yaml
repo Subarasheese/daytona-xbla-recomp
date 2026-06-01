@@ -1,0 +1,152 @@
+name: Nightly rexglue-sdk
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  actions: write
+
+env:
+  DEV_BRANCH: development
+  NIGHTLY_TAG_PREFIX: nightly-
+  NIGHTLY_RETENTION: 10
+  RELEASE_LIST_LIMIT: 1000
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.compare.outputs.should_build }}
+      dev_sha: ${{ steps.compare.outputs.dev_sha }}
+      prev_nightly_sha: ${{ steps.compare.outputs.prev_nightly_sha }}
+      tag_name: ${{ steps.compare.outputs.tag_name }}
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.DEV_BRANCH }}
+          fetch-depth: 1
+
+      - name: Compare dev HEAD to most recent nightly
+        id: compare
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dev_sha=$(git rev-parse HEAD)
+          short_sha="${dev_sha:0:8}"
+          tag_name="${NIGHTLY_TAG_PREFIX}$(date -u +%Y%m%d)-${short_sha}"
+          echo "dev_sha=${dev_sha}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+          prev_release=$(gh release list --limit "${RELEASE_LIST_LIMIT}" \
+            --json tagName,isPrerelease,createdAt \
+            | jq -r --arg prefix "${NIGHTLY_TAG_PREFIX}" \
+                '[.[] | select(.isPrerelease) | select(.tagName | startswith($prefix))]
+                  | sort_by(.createdAt) | last | .tagName // ""' \
+            2>/dev/null || echo "")
+          if [ -n "${prev_release}" ]; then
+            prev_sha=$(gh release view "${prev_release}" --json targetCommitish -q .targetCommitish 2>/dev/null || echo "")
+          else
+            prev_sha=""
+          fi
+          echo "prev_nightly_sha=${prev_sha}" >> "$GITHUB_OUTPUT"
+          if [ "${dev_sha}" = "${prev_sha}" ]; then
+            echo "${DEV_BRANCH} unchanged since last nightly (${dev_sha}); skipping build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${DEV_BRANCH} advanced (${prev_sha:-<no prior nightly>} -> ${dev_sha}); building as ${tag_name}."
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-win-amd64:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    uses: ./.github/workflows/_build-platform.yaml
+    with:
+      platform: win-amd64
+      ref: ${{ needs.check.outputs.dev_sha }}
+      publish_mode: artifact
+      artifact_name: nightly-win-amd64
+    secrets: inherit
+
+  build-linux-amd64:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    uses: ./.github/workflows/_build-platform.yaml
+    with:
+      platform: linux-amd64
+      ref: ${{ needs.check.outputs.dev_sha }}
+      publish_mode: artifact
+      artifact_name: nightly-linux-amd64
+    secrets: inherit
+
+  build-linux-arm64:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+    uses: ./.github/workflows/_build-platform.yaml
+    with:
+      platform: linux-arm64
+      ref: ${{ needs.check.outputs.dev_sha }}
+      publish_mode: artifact
+      artifact_name: nightly-linux-arm64
+    secrets: inherit
+
+  publish:
+    needs: [check, build-win-amd64, build-linux-amd64, build-linux-arm64]
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.check.outputs.dev_sha }}
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: Publish nightly release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build-win-amd64.outputs.version }}
+          DEV_SHA: ${{ needs.check.outputs.dev_sha }}
+          PREV_SHA: ${{ needs.check.outputs.prev_nightly_sha }}
+          TAG_NAME: ${{ needs.check.outputs.tag_name }}
+        run: |
+          if [ -n "${PREV_SHA}" ] && git cat-file -e "${PREV_SHA}^{commit}" 2>/dev/null; then
+            commits=$(git log --no-merges --pretty='format:- %s (%h)' "${PREV_SHA}..${DEV_SHA}")
+            range_header="Changes since previous nightly (\`${PREV_SHA:0:8}\`):"
+          else
+            commits=$(git log --no-merges --pretty='format:- %s (%h)' -20 "${DEV_SHA}")
+            range_header="Latest commits on \`${DEV_BRANCH}\`:"
+          fi
+          if [ -z "${commits}" ]; then
+            commits="- (no new commits)"
+          fi
+          notes=$(printf '%s\n\n%s\n' "${range_header}" "${commits}")
+          gh release create "${TAG_NAME}" \
+            --target "${DEV_SHA}" \
+            --title "Nightly ${VERSION}" \
+            --notes "${notes}" \
+            --prerelease \
+            artifacts/nightly-win-amd64/*.zip \
+            artifacts/nightly-linux-amd64/*.zip \
+            artifacts/nightly-linux-arm64/*.zip
+
+      - name: Prune old nightlies
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release list --limit "${RELEASE_LIST_LIMIT}" \
+            --json tagName,isPrerelease,createdAt \
+            | jq -r --arg prefix "${NIGHTLY_TAG_PREFIX}" --argjson keep "${NIGHTLY_RETENTION}" \
+                '[.[] | select(.isPrerelease) | select(.tagName | startswith($prefix))]
+                  | sort_by(.createdAt) | reverse | .[$keep:] | .[].tagName' \
+            | while IFS= read -r tag; do
+                [ -z "${tag}" ] && continue
+                echo "Pruning ${tag}"
+                gh release delete "${tag}" --yes --cleanup-tag
+              done

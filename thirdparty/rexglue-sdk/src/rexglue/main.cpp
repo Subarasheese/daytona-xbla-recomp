@@ -1,0 +1,116 @@
+/**
+ * @file        rexglue/main.cpp
+ * @brief       ReXGlue CLI tool entry point
+ *
+ * @copyright   Copyright (c) 2026 Tom Clay
+ * @license     BSD 3-Clause License
+ */
+
+#include "cli_utils.h"
+#include "commands/codegen_command.h"
+#include "commands/init_command.h"
+#include "commands/test_recompiler.h"
+#include "ui/ui.h"
+
+#include <chrono>
+#include <cstdlib>
+#include <map>
+#include <string>
+
+#include <CLI/CLI.hpp>
+#include <fmt/format.h>
+
+#include <rex/cvar.h>
+#include <rex/logging.h>
+#include <rex/result.h>
+#include <rex/version.h>
+
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
+namespace {
+
+std::string TitleString() {
+  return fmt::format("ReXGlue v{} - Xbox 360 Recompilation Toolkit", REXGLUE_VERSION_STRING);
+}
+
+bool IsStderrTty() {
+#ifdef _WIN32
+  return _isatty(_fileno(stderr)) != 0;
+#else
+  return isatty(fileno(stderr)) != 0;
+#endif
+}
+
+bool ColorEnabled(bool tty) {
+  if (const char* nc = std::getenv("NO_COLOR"); nc && *nc)
+    return false;
+  return tty;
+}
+
+void ConfigureLogging(const std::string& level, const std::string& log_file, bool verbose) {
+  std::map<std::string, std::string> category_levels;
+  auto config = rex::BuildLogConfig(log_file.empty() ? nullptr : log_file.c_str(),
+                                    verbose ? "trace" : level, category_levels);
+  config.log_to_console = true;
+  rex::InitLogging(config);
+  rex::RegisterLogLevelCallback();
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  CLI::App app{TitleString(), "rexglue"};
+  app.set_version_flag("--version", REXGLUE_VERSION_STRING);
+  app.require_subcommand(1);
+
+  rexglue::cli::CliContext ctx;
+  std::string log_level = "info";
+  std::string log_file;
+  bool verbose = false;
+  bool force = false;
+
+  app.add_option("--log-level", log_level, "Log level (trace, debug, info, warn, error)")
+      ->type_name("LEVEL");
+  app.add_option("--log-file", log_file, "Append diagnostics to file")->type_name("PATH");
+  app.add_flag("-v,--verbose", verbose, "Equivalent to --log-level=trace");
+  app.add_flag("-f,--force", force, "Skip confirmations and proceed");
+
+  rex::InitLoggingEarly();
+  rex::cvar::ApplyEnvironment();
+
+  rexglue::cli::DeferredAction pending;
+  rexglue::cli::RegisterCodegen(app, ctx, pending);
+  rexglue::cli::RegisterInit(app, ctx, pending);
+  rexglue::cli::RegisterRecompileTests(app, ctx, pending);
+
+  CLI11_PARSE(app, argc, argv);
+
+  ConfigureLogging(log_level, log_file, verbose);
+  ctx.verbose = verbose;
+  ctx.overwrite_existing = force;
+  ctx.generate_despite_errors = force;
+  ctx.skip_upgrade_consent = force;
+
+  bool tty = IsStderrTty();
+  rexglue::ui::Init({.tty = tty, .color = ColorEnabled(tty)});
+  rexglue::ui::Banner(TitleString());
+
+  auto start = std::chrono::steady_clock::now();
+  rex::Result<void> result = pending ? pending() : rex::Ok();
+  auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+      std::chrono::steady_clock::now() - start);
+
+  int exit_code = 0;
+  if (!result) {
+    rexglue::ui::FailureSummary(result.error().what(), elapsed);
+    exit_code = result.error().category == rex::ErrorCategory::UserAbort ? 2 : 1;
+  } else {
+    rexglue::ui::DoneSummary(elapsed);
+  }
+  rexglue::ui::Shutdown();
+  return exit_code;
+}
