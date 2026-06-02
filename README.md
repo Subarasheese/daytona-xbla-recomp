@@ -102,14 +102,7 @@ Microsoft Xbox 360 executable (XA-2845, media ID: 3CA562D4), all regions
 
 ## Required ReXGlue SDK
 
-This recompilation requires this exact ReXGlue SDK branch:
-
-```text
-https://github.com/Subarasheese/rexglue-sdk.git
-branch: daytonaxbla
-```
-
-It is vendored as a git submodule at:
+This recompilation requires the `daytonaxbla` branch of the ReXGlue SDK — **not** the default branch. It is vendored as a git submodule at:
 
 ```text
 thirdparty/rexglue-sdk
@@ -123,7 +116,7 @@ git submodule update --init --recursive
 
 If `git submodule status --recursive` prints nothing even though `.gitmodules`
 contains `thirdparty/rexglue-sdk`, the submodule was not recorded in the index.
-Add it with:
+Re-add it — the `-b daytonaxbla` flag is required:
 
 ```sh
 git submodule add -b daytonaxbla https://github.com/Subarasheese/rexglue-sdk.git thirdparty/rexglue-sdk
