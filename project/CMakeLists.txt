@@ -20,8 +20,16 @@ else()
         "Expected path: ${REXGLUE_SDK_SOURCE_DIR}")
 endif()
 
-# Include generated source list from rexglue codegen
-include(${CMAKE_SOURCE_DIR}/../generated/sources.cmake)
+# Include generated source list from rexglue codegen.
+# On a fresh clone this file doesn't exist yet; create an empty stub so CMake
+# configure succeeds before the first codegen run.
+set(_SOURCES_CMAKE "${CMAKE_SOURCE_DIR}/../generated/sources.cmake")
+if(NOT EXISTS "${_SOURCES_CMAKE}")
+    message(STATUS "generated/sources.cmake not found — run codegen before building (see README)")
+    file(MAKE_DIRECTORY "${CMAKE_SOURCE_DIR}/../generated")
+    file(WRITE "${_SOURCES_CMAKE}" "# Auto-created stub; run codegen to populate\nset(GENERATED_SOURCES)\n")
+endif()
+include("${_SOURCES_CMAKE}")
 
 add_executable(daytona
     src/main.cpp

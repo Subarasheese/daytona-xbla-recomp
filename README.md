@@ -155,12 +155,17 @@ the exact files and reasons.
 
 ## Build
 
-Configure the project with CMake from `project/`. The build always uses the
-vendored `thirdparty/rexglue-sdk` submodule.
-
-Example:
+Configure and build from the repository root:
 
 ```sh
+cmake --preset linux-amd64 -S project
+cmake --build project/out/build/linux-amd64 --config Release
+```
+
+Alternatively, `cd project/` first and run the presets without the `-S` / path overrides:
+
+```sh
+cd project
 cmake --preset linux-amd64
 cmake --build --preset linux-amd64-release
 ```
