@@ -8,6 +8,24 @@ No copyrighted game files are included. This tree excludes the
 extracted game directory, `default.xex`, `pe_image.bin`, media archives, audio,
 images, and build outputs.
 
+## Prerequisites
+
+### All platforms
+
+- **CMake 3.25+**
+- **Ninja** build system
+
+### Windows
+
+- [**Visual Studio 2022 Community**](https://visualstudio.microsoft.com/vs/community/) with the **Desktop development with C++** workload, including:
+  - **C++ Clang Compiler for Windows** (20.x or newer)
+  - **MSBuild support for LLVM (clang-cl) toolset**
+
+### Linux
+
+- **Clang 20+**
+- GTK3 development headers (`libgtk-3-dev` on Debian/Ubuntu, `gtk3` on Arch)
+
 ## Included
 
 ```text
@@ -31,7 +49,7 @@ project/src/main.cpp
 
 `project/src/daytona_symbols.h` is the full symbol map from the working version.
 
-## Required Local Game Files
+## Required local game files
 
 To regenerate codegen or run the project, provide your own legally obtained
 Daytona USA XBLA package in:
@@ -122,13 +140,22 @@ CMake may warn that no `v*` tag is reachable from the SDK checkout and fall
 back to `0.8.0.0-dev.unknown`. That warning did not block configure, codegen, or
 the Release build on this tree.
 
-## Regenerate Codegen
+## Regenerate codegen
 
 From the repository root:
+
+**Linux**
 
 ```sh
 cmake --preset linux-amd64 -S project
 cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen
+```
+
+**Windows**
+
+```bat
+cmake --preset win-amd64 -S project
+cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen
 ```
 
 That target uses the `rex::rexglue` executable built from
@@ -140,7 +167,7 @@ and printed `Done in 4.4s.`, then `rexglue` exited with signal 11 and Ninja
 reported the target as failed. Treat the generated files as usable if the run
 reaches `Done`, then apply the working patch below.
 
-## Apply Working Codegen Fixes
+## Apply working codegen fixes
 
 The working daytona tree has manual fixes on top of regenerated
 codegen. Apply them with:
@@ -155,19 +182,36 @@ the exact files and reasons.
 
 ## Build
 
-Configure and build from the repository root:
+Configure and build from the repository root.
+
+**Linux**
 
 ```sh
 cmake --preset linux-amd64 -S project
 cmake --build project/out/build/linux-amd64 --config Release
 ```
 
-Alternatively, `cd project/` first and run the presets without the `-S` / path overrides:
+**Windows**
+
+```bat
+cmake --preset win-amd64 -S project
+cmake --build project/out/build/win-amd64 --config Release
+```
+
+Alternatively on either platform, `cd project/` first and run the presets without the `-S` / path overrides:
 
 ```sh
+# Linux
 cd project
 cmake --preset linux-amd64
 cmake --build --preset linux-amd64-release
+```
+
+```bat
+rem Windows
+cd project
+cmake --preset win-amd64
+cmake --build --preset win-amd64-release
 ```
 
 If configuration fails with a missing SDK message, run:
@@ -181,7 +225,7 @@ needs two SDK include paths in `project/CMakeLists.txt`:
 
 ```text
 thirdparty/rexglue-sdk/thirdparty/imgui
-project/out/build/linux-amd64/rexglue-sdk/include
+project/out/build/<preset>/rexglue-sdk/include   (linux-amd64 or win-amd64)
 ```
 
 Without them, the Release build fails with missing `imgui.h` or
@@ -189,9 +233,12 @@ Without them, the Release build fails with missing `imgui.h` or
 
 ## Run
 
+Provide the extracted game directory via `--game_data_root`.
+
+**Linux**
+
 The executable links against SDK shared libraries from the build output. Run it
-with `LD_LIBRARY_PATH`, and provide the extracted game directory as
-`--game_data_root`:
+with `LD_LIBRARY_PATH`:
 
 ```sh
 LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" \
@@ -213,6 +260,18 @@ timeout 20 env \
   --log_level=debug
 ```
 
+If `LD_LIBRARY_PATH` is omitted, `ldd project/out/build/linux-amd64/Release/daytona`
+shows `librexruntime.so => not found` and `libTracyClient.so => not found`.
+
+**Windows**
+
+The build step automatically copies runtime DLLs next to the executable, so no
+`PATH` changes are needed. Run from the repository root:
+
+```bat
+project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted
+```
+
 `logs/` and `*.log` are ignored so local runtime logs are not uploaded.
 
 This has been confirmed to build and run from this checkout after extracting the
@@ -227,6 +286,3 @@ If `--game_data_root` is omitted, startup exits immediately with:
 ```text
 [ERROR] --game_data_root was not provided.
 ```
-
-If `LD_LIBRARY_PATH` is omitted, `ldd project/out/build/linux-amd64/Release/daytona`
-shows `librexruntime.so => not found` and `libTracyClient.so => not found`.
