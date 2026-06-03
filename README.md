@@ -175,6 +175,8 @@ the exact files and reasons.
 
 ## Build
 
+> **Prerequisites:** complete [Regenerate codegen](#regenerate-codegen) and [Apply working codegen fixes](#apply-working-codegen-fixes) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
+
 Configure and build from the repository root.
 
 **Linux**

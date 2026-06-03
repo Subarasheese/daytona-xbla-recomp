@@ -31,6 +31,15 @@ if(NOT EXISTS "${_SOURCES_CMAKE}")
 endif()
 include("${_SOURCES_CMAKE}")
 
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/../generated/daytona_init.h")
+    message(FATAL_ERROR
+        "generated/daytona_init.h not found — run codegen before building:\n"
+        "  cmake --build <build-dir> --target daytona_codegen\n"
+        "Then apply the working patch:\n"
+        "  patch -p0 < patches/daytona_working_codegen.patch\n"
+        "See README for details.")
+endif()
+
 add_executable(daytona
     src/main.cpp
     src/stubs.cpp
