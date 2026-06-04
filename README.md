@@ -8,6 +8,21 @@ No copyrighted game files are included. This tree excludes the
 extracted game directory, `default.xex`, `pe_image.bin`, media archives, audio,
 images, and build outputs.
 
+## Quick start
+
+Building requires completing every step below in order. Skipping any step will cause the next one to fail.
+
+1. Install [prerequisites](#prerequisites)
+2. Clone with submodules: `git clone --recurse-submodules <this repo>`
+3. Place your game package in `game/` and run `python3 scripts/extract_game.py`
+4. Configure: `cmake --preset linux-amd64 -S project` (or `win-amd64`)
+5. Run codegen: `cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen`
+6. Apply the patch: `patch -p0 < patches/daytona_working_codegen.patch`
+7. Build: `cmake --build project/out/build/linux-amd64 --config Release`
+8. Run: `LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" project/out/build/linux-amd64/Release/daytona --game_data_root="$PWD/extracted"`
+
+See the sections below for details on each step and Windows equivalents.
+
 ## Prerequisites
 
 ### All platforms
