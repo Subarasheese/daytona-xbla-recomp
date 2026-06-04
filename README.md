@@ -15,11 +15,19 @@ Building requires completing every step below in order. Skipping any step will c
 1. Install [prerequisites](#prerequisites)
 2. Clone with submodules: `git clone --recurse-submodules <this repo>`
 3. Place your game package in `game/` and run `python3 scripts/extract_game.py`
-4. Configure — Linux: `cmake --preset linux-amd64 -S project` / Windows: `cmake --preset win-amd64 -S project`
-5. Run codegen — Linux: `cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen` / Windows: `cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen`
+4. Configure:
+   - Linux: `cmake --preset linux-amd64 -S project`
+   - Windows: `cmake --preset win-amd64 -S project`
+5. Run codegen:
+   - Linux: `cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen`
+   - Windows: `cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen`
 6. Apply the patch: `patch -p0 < patches/daytona_working_codegen.patch`
-7. Build — Linux: `cmake --build project/out/build/linux-amd64 --config Release` / Windows: `cmake --build project/out/build/win-amd64 --config Release`
-8. Run — Linux: `LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" project/out/build/linux-amd64/Release/daytona --game_data_root="$PWD/extracted"` / Windows: `project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted`
+7. Build:
+   - Linux: `cmake --build project/out/build/linux-amd64 --config Release`
+   - Windows: `cmake --build project/out/build/win-amd64 --config Release`
+8. Run:
+   - Linux: `LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" project/out/build/linux-amd64/Release/daytona --game_data_root="$PWD/extracted"`
+   - Windows: `project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted`
 
 See the sections below for details on each step and Windows equivalents.
 
