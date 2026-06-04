@@ -26,7 +26,7 @@ images, and build outputs.
 - **Clang 20+**
 - GTK3 development headers (`libgtk-3-dev` on Debian/Ubuntu, `gtk3` on Arch)
 - X11/XCB interop library (`libx11-xcb-dev` on Debian/Ubuntu, `libx11` on Arch, `libX11-devel` on Fedora)
-- XWayland or a native X11 session — native Wayland without XWayland is not currently supported
+- XWayland or a native X11 session (the SDK renders via XCB; on Wayland, XWayland must be running)
 
 ## Included
 
