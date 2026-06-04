@@ -6,14 +6,6 @@ No copyrighted game files are included. This tree excludes the
 extracted game directory, `default.xex`, `pe_image.bin`, media archives, audio,
 images, and build outputs.
 
-## Roadmap
-
-| Feature | Status |
-|---------|--------|
-| Arbitrary resolution support (including ultrawide 21:9 and wider) | Planned |
-| Keyboard control mapping | Planned |
-| Android port | Planned |
-
 ## Quick start
 
 Building requires completing every step below in order. Skipping any step will cause the next one to fail.
@@ -312,3 +304,11 @@ If `--game_data_root` is omitted, startup exits immediately with:
 ```text
 [ERROR] --game_data_root was not provided.
 ```
+
+## Roadmap
+
+| Feature | Status |
+|---------|--------|
+| Arbitrary resolution support (including ultrawide 21:9 and wider) | Planned |
+| Keyboard control mapping | Planned |
+| Android port | Planned |
