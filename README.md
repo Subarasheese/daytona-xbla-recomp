@@ -312,3 +312,4 @@ If `--game_data_root` is omitted, startup exits immediately with:
 | Arbitrary resolution support (including ultrawide 21:9 and wider) | Planned |
 | Keyboard control mapping | Planned |
 | Android port | Planned |
+| Native rendering (replace Xbox 360 GPU emulation with a native Vulkan/D3D12 backend) | Planned |
