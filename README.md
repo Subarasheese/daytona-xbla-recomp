@@ -1,7 +1,5 @@
 # Daytona USA ReXGlue Recompilation
 
-![Daytona Recompilation](daytonarecomp.png)
-
 This project is a static recompilation of Daytona USA (Xbox 360 / XBLA, 2011) using Rexglue.
 
 No copyrighted game files are included. This tree excludes the
