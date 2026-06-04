@@ -31,16 +31,22 @@ if(NOT EXISTS "${_SOURCES_CMAKE}")
 endif()
 include("${_SOURCES_CMAKE}")
 
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/../generated/daytona_init.h")
-    message(STATUS "generated/daytona_init.h not found — run codegen before building (see README)")
-endif()
-
 add_executable(daytona
     src/main.cpp
     src/stubs.cpp
     src/keyboard_driver.cpp
     src/daytona_debug.cpp
     ${GENERATED_SOURCES}
+)
+
+# Fail the build with a clear message if codegen has not been run.
+# Configure must succeed so the daytona_codegen target is available; the check
+# runs as a PRE_BUILD step so it fires before any .cpp is compiled.
+add_custom_command(TARGET daytona PRE_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DCODEGEN_INIT_H=${CMAKE_SOURCE_DIR}/../generated/daytona_init.h"
+        -P "${CMAKE_CURRENT_LIST_DIR}/cmake/require_codegen.cmake"
+    VERBATIM
 )
 
 # Let rexglue_configure_target add: entry point, rex_app.cpp, mcmodel=large,
