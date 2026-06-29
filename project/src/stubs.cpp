@@ -449,28 +449,6 @@ static void DumpGuestBacktrace(uint8_t* base, const PPCContext& ctx, const char*
 }
 
 
-REX_HOOK_RAW(sub_82266808) {
-    REXLOG_ERROR("Daytona failure sink sub_82266808 enter lr={:08X} r3={:08X} r4={:08X} r5={:08X} r6={:08X} r7={:08X} r8={:08X} r9={:08X} r10={:08X}",
-                 static_cast<uint32_t>(ctx.lr),
-                 ctx.r3.u32,
-                 ctx.r4.u32,
-                 ctx.r5.u32,
-                 ctx.r6.u32,
-                 ctx.r7.u32,
-                 ctx.r8.u32,
-                 ctx.r9.u32,
-                 ctx.r10.u32);
-
-    if (ctx.r3.u32 & 0x80000000u) {
-        DumpGuestBacktrace(base, ctx, "negative HRESULT entering sub_82266808");
-    }
-
-    __imp__sub_82266808(ctx, base);
-
-    REXLOG_ERROR("Daytona failure sink sub_82266808 exit result={:08X} lr={:08X}",
-                 ctx.r3.u32,
-                 static_cast<uint32_t>(ctx.lr));
-}
 #define DT_LOG_F9288_CHILD(name) \
     REX_HOOK_RAW(name) { \
         REXLOG_ERROR("Daytona F9288 child " #name " enter lr={:08X} r3={:08X} r4={:08X} r5={:08X} r6={:08X} r7={:08X} r8={:08X} r9={:08X} r10={:08X}", static_cast<uint32_t>(ctx.lr), ctx.r3.u32, ctx.r4.u32, ctx.r5.u32, ctx.r6.u32, ctx.r7.u32, ctx.r8.u32, ctx.r9.u32, ctx.r10.u32); \
