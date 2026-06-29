@@ -170,7 +170,7 @@ The `generated/` and `config/generated/` directories are local codegen outputs a
 
 ## Build
 
-> **Prerequisites:** complete [Regenerate codegen](#regenerate-codegen) and [Apply working codegen fixes](#apply-working-codegen-fixes) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
+> **Prerequisites:** Complete [Regenerate codegen](#regenerate-codegen) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
 
 Configure and build from the repository root.
 
