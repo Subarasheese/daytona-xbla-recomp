@@ -548,61 +548,6 @@ extern "C" REX_FUNC(sub_824C8D80) {
     sub_824C78D0(ctx, base);
 }
 
-// Daytona manual missing leaf sub_82342258.
-// The recompiler skipped this valid PPC leaf routine, but guest code calls it
-// indirectly as a comparator from sub_824DEC68.
-extern "C" REX_FUNC(sub_82342258) {
-    static uint32_t calls = 0;
-    ++calls;
-
-    const uint32_t left_obj = REX_LOAD_U32(ctx.r3.u32 + 0);
-    const uint32_t right_obj = REX_LOAD_U32(ctx.r4.u32 + 0);
-
-    auto key_from_word = [](uint32_t word) -> uint32_t {
-        // PPC: rlwinm rX,rX,19,16,31
-        return ((word << 19) | (word >> 13)) & 0xFFFFu;
-    };
-
-    uint32_t left_max = 0;
-    for (uint32_t node = REX_LOAD_U32(left_obj + 0x20); node != 0; node = REX_LOAD_U32(node + 4)) {
-        const uint32_t payload = REX_LOAD_U32(node + 0);
-        const uint32_t word = REX_LOAD_U32(payload + 0);
-        const uint32_t key = key_from_word(word);
-        if (key > left_max) {
-            left_max = key;
-        }
-    }
-
-    uint32_t right_max = 0;
-    for (uint32_t node = REX_LOAD_U32(right_obj + 0x20); node != 0; node = REX_LOAD_U32(node + 4)) {
-        const uint32_t payload = REX_LOAD_U32(node + 0);
-        const uint32_t word = REX_LOAD_U32(payload + 0);
-        const uint32_t key = key_from_word(word);
-        if (key > right_max) {
-            right_max = key;
-        }
-    }
-
-    if (left_max == right_max) {
-        ctx.r3.s64 = 0;
-    } else {
-        // Matches the small helper at 0x823422CC: descending order.
-        ctx.r3.s64 = (right_max > left_max) ? 1 : -1;
-    }
-
-    if (ShouldLog(calls)) {
-        REXLOG_ERROR("Daytona manual missing leaf sub_82342258 call #{} lr={:08X} left={:08X} right={:08X} left_max={:08X} right_max={:08X} result={:08X}",
-                     calls,
-                     static_cast<uint32_t>(ctx.lr),
-                     ctx.r3.u32,
-                     ctx.r4.u32,
-                     left_max,
-                     right_max,
-                     ctx.r3.u32);
-    }
-}
-
-
 // License flag: set to true for full version (trial mode when false)
 static constexpr bool kFullVersion = true;
 
