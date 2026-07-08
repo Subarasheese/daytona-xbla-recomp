@@ -1,6 +1,10 @@
 # Daytona USA ReXGlue Recompilation
 
-This project is a static recompilation of Daytona USA (Xbox 360 / XBLA, 2011) using ReXGlue. No copyrighted game files are included.
+This project is a static recompilation of Daytona USA (Xbox 360 / XBLA, 2011) using Rexglue.
+
+No copyrighted game files are included. This tree excludes the
+extracted game directory, `default.xex`, `pe_image.bin`, media archives, audio,
+images, and build outputs.
 
 ## Quick start
 
@@ -15,10 +19,11 @@ Building requires completing every step below in order. Skipping any step will c
 5. Run codegen:
    - Linux: `cmake --build project/out/build/linux-amd64 --config Release --target daytona_codegen`
    - Windows: `cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen`
-6. Build:
+6. Apply the patch: `patch -p0 < patches/daytona_working_codegen.patch`
+7. Build:
    - Linux: `cmake --build project/out/build/linux-amd64 --config Release`
    - Windows: `cmake --build project/out/build/win-amd64 --config Release`
-7. Run:
+8. Run:
    - Linux: `LD_LIBRARY_PATH="$PWD/thirdparty/rexglue-sdk/out/linux-amd64/Release" project/out/build/linux-amd64/Release/daytona --game_data_root="$PWD/extracted"`
    - Windows: `project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted`
 
@@ -48,10 +53,12 @@ See the sections below for details on each step and Windows equivalents.
 
 ```text
 config/                         ReXGlue manifest/config files
+patches/daytona_working_codegen.patch
+docs/CODEGEN_PATCHES.md         notes for the manual codegen patch
 ppc/                            PPC metadata headers
 project/                        host project sources and CMake files
 scripts/extract_game.py         local STFS package extractor
-thirdparty/rexglue-sdk          required ReXGlue SDK submodule
+thirdparty/rexglue-sdk           required ReXGlue SDK submodule
 ```
 
 The host project sources were copied from the running `daytona_working` tree,
@@ -67,7 +74,8 @@ project/src/main.cpp
 
 ## Required local game files
 
-To regenerate codegen or run the project, provide your own legally obtained Daytona USA XBLA package in:
+To regenerate codegen or run the project, provide your own legally obtained
+Daytona USA XBLA package in:
 
 ```text
 game/
@@ -107,8 +115,9 @@ assets/default.xex
 ../assets/default.xex
 ```
 
-`game/`, `extracted/`, and `assets/` are ignored by git because they contain copyrighted game files.
-A successful extraction currently produces 162 files; the root `default.xex` should be detected by `file` as:
+`game/`, `extracted/`, and `assets/` are ignored by git because they contain
+copyrighted game files. A successful extraction currently produces 162 files;
+the root `default.xex` should be detected by `file` as:
 
 ```text
 Microsoft Xbox 360 executable (XA-2845, media ID: 3CA562D4), all regions
@@ -165,12 +174,31 @@ cmake --preset win-amd64 -S project
 cmake --build project/out/build/win-amd64 --config Release --target daytona_codegen
 ```
 
-That target uses the `rex::rexglue` executable built from `thirdparty/rexglue-sdk`.
-The `generated/` and `config/generated/` directories are local codegen outputs and are intentionally ignored by Git.
+That target uses the `rex::rexglue` executable built from
+`thirdparty/rexglue-sdk`. The `generated/` and `config/generated/` directories
+are local codegen outputs and are intentionally ignored by Git.
+
+On this checkout, the `daytona_codegen` target successfully regenerated files
+and printed `Done in 4.4s.`, then `rexglue` exited with signal 11 and Ninja
+reported the target as failed. Treat the generated files as usable if the run
+reaches `Done`, then apply the working patch below.
+
+## Apply working codegen fixes
+
+The working daytona tree has manual fixes on top of regenerated
+codegen. Apply them with:
+
+```sh
+patch -p0 < patches/daytona_working_codegen.patch
+```
+
+The patch changes only generated files. Keep the generated outputs ignored and
+commit the patch, not the regenerated files. See `docs/CODEGEN_PATCHES.md` for
+the exact files and reasons.
 
 ## Build
 
-> **Prerequisites:** Complete [Regenerate codegen](#regenerate-codegen) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
+> **Prerequisites:** complete [Regenerate codegen](#regenerate-codegen) and [Apply working codegen fixes](#apply-working-codegen-fixes) first. The build requires generated headers such as `daytona_init.h` that do not exist in the repository.
 
 Configure and build from the repository root.
 
@@ -264,9 +292,12 @@ project\out\build\win-amd64\Release\daytona.exe --game_data_root=extracted
 
 `logs/` and `*.log` are ignored so local runtime logs are not uploaded.
 
-This has been confirmed to build and run from this checkout after building the Release preset.
-During a working run, the log may still print repeated `NtQueryInformationFile(XFileXctdCompressionInformation) unimplemented`
-messages and occasional `Skipping Vulkan frame presentation due to async placeholder draw usage in this frame` warnings.
+This has been confirmed to build and run from this checkout after extracting the
+package, regenerating code, applying `patches/daytona_working_codegen.patch`,
+and building the Release preset. During a working run, the log may still print
+repeated `NtQueryInformationFile(XFileXctdCompressionInformation) unimplemented`
+messages and occasional `Skipping Vulkan frame presentation due to async
+placeholder draw usage in this frame` warnings.
 
 If `--game_data_root` is omitted, startup exits immediately with:
 
